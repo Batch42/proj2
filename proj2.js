@@ -31,8 +31,6 @@ window.onload = function init()
     gl = WebGLUtils.setupWebGL( canvas );
     if ( !gl ) { alert( "WebGL isn't available" ); }
 
-
-
     //
     //  Configure WebGL
     //
@@ -41,17 +39,25 @@ window.onload = function init()
 
     gl.enable(gl.DEPTH_TEST);
 
-    light = vec4(0.0, 2.0, 0.0, 0.0);
+    light = lightSource.position;
 
     m = mat4();
     m[3][3] = 0;
-    m[3][1] = -1/light[1];
+    m[3][1] = -.5/light[1];
 
     at = vec3(0.0, 0.0, 0.0);
     up = vec3(0.0, 1.0, 0.0);
-    eye = vec3(0.0, 0.0, 0.0);
+    eye = vec3(0.0, 1.0, 1.0);
 
-    createObjs(light);
+    var len=createObjs();
+    //console.log(len);
+    var tmpColor=[];
+    for(var i=0;i<len;i++){
+    	tmpColor.push(vec4( 0.0, 0.0, 0.0,1.0));
+    }
+    fColor = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, fColor );
+    gl.bufferData( gl.ARRAY_BUFFER, flatten(tmpColor), gl.STATIC_DRAW );
 
     //  Load shaders and initialize attribute buffers
     program = initShaders( gl, "vertex-shader", "fragment-shader" );
@@ -74,12 +80,16 @@ function render() {
   ////////////////////////
   for(i = 0; i < 3; i++) {
     modelViewMatrix = lookAt(eye, at, up);
+    gl.bindBuffer( gl.ARRAY_BUFFER, objs[i].normalsBuffer );
+	  var vNormal = gl.getAttribLocation( program, "vNormal" );
+	  gl.vertexAttribPointer( vNormal, 3, gl.FLOAT, false, 0, 0 );
+	  gl.enableVertexAttribArray( vNormal );
 
-	  gl.bindBuffer( gl.ARRAY_BUFFER, objs[i].colorBuffer );
+//	  gl.bindBuffer( gl.ARRAY_BUFFER, objs[i].colorBuffer );
 	  //vColor
-	  var vColor = gl.getAttribLocation( program, "vColor" );
-	  gl.vertexAttribPointer( vColor, 4, gl.FLOAT, false, 0, 0 );
-	  gl.enableVertexAttribArray( vColor );
+//	  var vColor = gl.getAttribLocation( program, "vColor" );
+//	  gl.vertexAttribPointer( vColor, 4, gl.FLOAT, false, 0, 0 );
+//	  gl.enableVertexAttribArray( vColor );
 
 	  //Vertex buffer
 	  gl.bindBuffer( gl.ARRAY_BUFFER, objs[i].pointsBuffer );
@@ -97,7 +107,7 @@ function render() {
 	  // //Set theta to shape's theta
 	  // gl.uniform3fv(objs[i].thetaLoc, objs[i].thetaVal);
 
-    modelViewMatrix = mult(modelViewMatrix, translate(objs[i].position[3], objs[i].position[4], objs[i].position[5]));
+	modelViewMatrix = mult(modelViewMatrix, translate(objs[i].position[3], objs[i].position[4], objs[i].position[5]));
 
     modelViewMatrix = mult(modelViewMatrix, rotateX(objs[i].position[0]));
     modelViewMatrix = mult(modelViewMatrix, rotateY(objs[i].position[1]));
@@ -107,13 +117,32 @@ function render() {
 
     gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
 
+	  var ambientProduct = mult(lightSource.ambient, objs[i].ambient);
+	  var diffuseProduct = mult(lightSource.diffuse, objs[i].diffuse);
+	  var specularProduct = mult(lightSource.specular, objs[i].specular);
+
+	   gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"),
+		       flatten(ambientProduct));
+	   gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"),
+		       flatten(diffuseProduct) );
+	   gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"),
+		       flatten(specularProduct) );
+	   gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"),
+		       flatten(lightSource.position) );
+
+	   gl.uniform1f(gl.getUniformLocation(program,
+		       "shininess"),objs[i].shine);
 	  //Draw pyramid
 	  gl.drawArrays( gl.TRIANGLES, 0, objs[i].points);
 
-    light[0] = 0.8;
-    light[1] = 1.2;
-    light[2] = -0.2;
-
+	   gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"),
+		       [0,0,0,0]);
+	   gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"),
+			   [0,0,0,0]);
+	   gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"),
+			   [0,0,0,0]);
+	   gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"),
+			   [0,0,0,0]);
     // model-view matrix for shadow then render
 
     modelViewMatrix = mult(modelViewMatrix, translate(light[0], light[1], light[2]));
@@ -122,11 +151,20 @@ function render() {
 
     // send color and matrix for shadow
 
+    gl.bindBuffer( gl.ARRAY_BUFFER, fColor);
+	  //vColor
+	 var vColor = gl.getAttribLocation( program, "vColor" );
+	 gl.vertexAttribPointer( vColor, 4, gl.FLOAT, false, 0, 0 );
+	 gl.enableVertexAttribArray( vColor );
+	if(i==0){var test =9;}
+	else if(i==1){var test =6;}
+	else{var test=768;}
+
     gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
-    gl.uniform4fv(fColor, vec4(0.0, 0.0, 0.0, 1.0));
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // gl.uniform4fv(fColor, vec4(0.0, 0.0, 0.0, 1.0));
+    gl.drawArrays(gl.TRIANGLES, 0, test);
 	 }
 
 	 //Call render again to make it animated
-	 window.requestAnimFrame(render);
+	 //window.requestAnimFrame(render);
 }
